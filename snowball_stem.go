@@ -24,10 +24,23 @@ func (sbs SnowBallStem) Stem(words []string) (string, error) {
 		}
 		//log.Printf("stteming word:\"%s\", stemmed:\"%s\"\n", word, stemmed)
 
-		if _, ok := was[stemmed]; !ok && !stop_checker.IsStopWord(stemmed) && !strings.Contains(stemmed, "'") {
+		if _, ok := was[stemmed]; !ok && !stop_checker.IsStopWord(stemmed) && !IsShortStopWord(stemmed) {
 			ans = append(ans, stemmed)
 			was[stemmed] = struct{}{}
 		}
 	}
 	return strings.Join(ans, " "), nil
+}
+
+func IsShortStopWord(line string) bool {
+	splitted := strings.Split(line, "'")
+	if len(splitted) != 2 {
+		return false
+	}
+	return splitted[1] == "ll" ||
+		splitted[1] == "re" ||
+		splitted[1] == "m" ||
+		splitted[1] == "s" ||
+		splitted[1] == "d" ||
+		splitted[1] == "ve"
 }
