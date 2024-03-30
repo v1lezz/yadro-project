@@ -5,6 +5,7 @@ import (
 	"github.com/kljensen/snowball"
 	stop_checker "github.com/kljensen/snowball/english"
 	"strings"
+	"unicode"
 )
 
 type SnowBallStem struct {
@@ -18,6 +19,7 @@ func (sbs SnowBallStem) Stem(words []string) (string, error) {
 	ans := make([]string, 0, len(words))
 	was := make(map[string]struct{})
 	for _, word := range words {
+		word = RemoveAllApartFromLetters(word)
 		stemmed, err := snowball.Stem(word, "english", false)
 		if err != nil {
 			return "", fmt.Errorf("error steming: %w", err)
@@ -43,4 +45,14 @@ func IsShortStopWord(line string) bool {
 		splitted[1] == "s" ||
 		splitted[1] == "d" ||
 		splitted[1] == "ve"
+}
+
+func RemoveAllApartFromLetters(word string) string {
+	ans := make([]rune, 0, len(word))
+	for _, val := range word {
+		if unicode.IsLetter(val) || val == '\'' {
+			ans = append(ans, val)
+		}
+	}
+	return string(ans)
 }
