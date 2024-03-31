@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/kljensen/snowball"
-	stop_checker "github.com/kljensen/snowball/english"
 	"strings"
-	"unicode"
+
+	"github.com/kljensen/snowball"
+	stopchecker "github.com/kljensen/snowball/english"
 )
 
 type SnowBallStem struct {
@@ -15,23 +15,21 @@ func NewSnowBallStem() *SnowBallStem {
 	return &SnowBallStem{}
 }
 
-func (sbs SnowBallStem) Stem(words []string) (string, error) {
+func (sbs SnowBallStem) Stem(words []string) ([]string, error) {
 	ans := make([]string, 0, len(words))
 	was := make(map[string]struct{})
 	for _, word := range words {
-		word = RemoveAllApartFromLetters(word)
 		stemmed, err := snowball.Stem(word, "english", false)
 		if err != nil {
-			return "", fmt.Errorf("error steming: %w", err)
+			return nil, fmt.Errorf("error steming: %w", err)
 		}
-		//log.Printf("stteming word:\"%s\", stemmed:\"%s\"\n", word, stemmed)
 
-		if _, ok := was[stemmed]; !ok && !stop_checker.IsStopWord(stemmed) && !IsShortStopWord(stemmed) {
+		if _, ok := was[stemmed]; !ok && !stopchecker.IsStopWord(stemmed) && !IsShortStopWord(stemmed) {
 			ans = append(ans, stemmed)
 			was[stemmed] = struct{}{}
 		}
 	}
-	return strings.Join(ans, " "), nil
+	return ans, nil
 }
 
 func IsShortStopWord(line string) bool {
@@ -47,12 +45,12 @@ func IsShortStopWord(line string) bool {
 		splitted[1] == "ve"
 }
 
-func RemoveAllApartFromLetters(word string) string {
-	ans := make([]rune, 0, len(word))
-	for _, val := range word {
-		if unicode.IsLetter(val) || val == '\'' {
-			ans = append(ans, val)
-		}
-	}
-	return string(ans)
-}
+//func RemoveAllApartFromLetters(word string) string {
+//	ans := make([]rune, 0, len(word))
+//	for _, val := range word {
+//		if unicode.IsLetter(val) || val == '\'' {
+//			ans = append(ans, val)
+//		}
+//	}
+//	return string(ans)
+//}

@@ -1,17 +1,18 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
+	"io"
+	"strings"
 )
 
 type App struct {
 	Parser  Parser
 	Stemmer Stemmer
-	Writer  *bufio.Writer
+	Writer  io.WriteCloser
 }
 
-func NewApp(parser Parser, stemmer Stemmer, writer *bufio.Writer) *App {
+func NewApp(parser Parser, stemmer Stemmer, writer io.WriteCloser) *App {
 	return &App{
 		Parser:  parser,
 		Writer:  writer,
@@ -24,7 +25,7 @@ type Parser interface {
 }
 
 type Stemmer interface {
-	Stem([]string) (string, error)
+	Stem([]string) ([]string, error)
 }
 
 func (a App) Run() error {
@@ -36,12 +37,12 @@ func (a App) Run() error {
 	if err != nil {
 		return fmt.Errorf("error stem: %w", err)
 	}
-	if _, err = fmt.Fprintln(a.Writer, ans); err != nil {
+	if _, err = fmt.Fprintln(a.Writer, strings.Join(ans, " ")); err != nil {
 		return fmt.Errorf("error writing, %w", err)
 	}
 	return nil
 }
 
 func (a App) Close() {
-	a.Writer.Flush()
+	a.Writer.Close()
 }

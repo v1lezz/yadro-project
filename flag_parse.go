@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"strings"
+	"unicode"
 )
 
 type FlagParse struct {
@@ -13,11 +14,10 @@ func NewFlagParse() *FlagParse {
 }
 
 func (fg FlagParse) Parse() ([]string, error) {
-	first := flag.String("s", "", "parsed string")
+	var ans string
+	flag.StringVar(&ans, "s", "", "parsed string")
 	flag.Parse()
-	ans := strings.Split(*first, " ")
-	//log.Printf("flag.String(): \"%s\" flag.Args():\"%s\"\n", *first, strings.Join(flag.Args(), " "))
-	ans = append(ans, flag.Args()...)
-	//log.Printf("parsed string:\"%s\"\n", strings.Join(ans, " "))
-	return ans, nil
+	return strings.FieldsFunc(ans, func(r rune) bool {
+		return !unicode.IsLetter(r) && r != '\''
+	}), nil
 }
