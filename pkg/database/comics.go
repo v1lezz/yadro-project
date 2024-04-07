@@ -27,9 +27,9 @@ func (c Comics) String(ID int) string {
 	return fmt.Sprintf("ID: %d\nimg_url: %s\nkeywords: \"%s\"", ID, c.ImgURL, strings.Join(c.Keywords, "\", \""))
 }
 
-func CheckComics(data map[string]Comics, cntInServer int) []uint {
-	ans := make([]uint, 0, cntInServer)
-	for i := 1; i <= cntInServer; i++ {
+func CheckComics(data map[string]Comics, n int) []uint {
+	ans := make([]uint, 0, n)
+	for i := 1; i <= n; i++ {
 		if _, ok := data[strconv.Itoa(i)]; !ok {
 			ans = append(ans, uint(i))
 		}

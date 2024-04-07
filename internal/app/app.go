@@ -29,8 +29,8 @@ func NewApp(parser Parser, stemmer Stemmer, repo Repository, flagParser FlagPars
 
 type Parser interface {
 	GetCountComicsInServer() (int, error)
-	PartParse([]uint) ([]xkcd.Comics, error)
-	FullParse(cntInServer int) ([]xkcd.Comics, error)
+	PartParse([]uint, int, int) ([]xkcd.Comics, error)
+	FullParse(cntInServer, n int) ([]xkcd.Comics, error)
 }
 
 type Stemmer interface {
@@ -48,22 +48,26 @@ type FlagParser interface {
 }
 
 func (a *App) Run() error {
-	dbComics, t, err := a.Repo.GetComics()
-	if err != nil {
-		return fmt.Errorf("error get comics from database: %w", err)
-	}
 	cntInServer, err := a.Parser.GetCountComicsInServer()
 	if err != nil {
 		return fmt.Errorf("error get count of comics in server: %w", err)
 	}
+	o, n, err := a.FlagParser.ParseFlagOandN(cntInServer)
+	if err != nil {
+		return err
+	}
+	dbComics, t, err := a.Repo.GetComics()
+	if err != nil {
+		return fmt.Errorf("error get comics from database: %w", err)
+	}
 	var parsedComics []xkcd.Comics
 	var tAns time.Time
 	if len(dbComics) == 0 || a.CheckMonth(t) {
-		parsedComics, err = a.Parser.FullParse(cntInServer)
+		parsedComics, err = a.Parser.FullParse(cntInServer, n)
 		tAns = time.Now()
 	} else {
-		isNotExists := database.CheckComics(dbComics, cntInServer)
-		parsedComics, err = a.Parser.PartParse(isNotExists)
+		isNotExists := database.CheckComics(dbComics, n)
+		parsedComics, err = a.Parser.PartParse(isNotExists, cntInServer, n)
 		tAns = t
 	}
 	if err = a.ComicsStemmer.SliceComicsStem(dbComics, parsedComics); err != nil {
@@ -72,12 +76,8 @@ func (a *App) Run() error {
 	if err = a.Repo.SaveComics(dbComics, tAns); err != nil {
 		return err
 	}
-	o, n, err := a.FlagParser.ParseFlagOandN(cntInServer)
-	if err != nil {
-		return err
-	}
 	if o {
-		for i, cntOutput := 0, 0; cntOutput < n; i++ {
+		for i, cntOutput := 0, 0; cntOutput < min(n, len(dbComics)); i++ {
 			if v, ok := dbComics[strconv.Itoa(i+1)]; ok {
 				_, err = fmt.Fprintf(a.Writer, "%s\n\n", v.String(i+1))
 				if err != nil {
