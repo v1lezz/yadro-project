@@ -1,2 +1,2 @@
 build:
-	go build -o myapp .
+	go build -o xkcd ./cmd/xkcd
