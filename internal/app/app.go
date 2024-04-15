@@ -30,11 +30,10 @@ func NewApp(parser Parser, stemmer Stemmer, repo Repository, flagParser FlagPars
 type Parser interface {
 	GetCountComicsInServer() (int, error)
 	PartParse([]uint, int, int) ([]xkcd.Comics, error)
-	FullParse(cntInServer, n int) ([]xkcd.Comics, error)
+	FullParse(cntInServer, start, end int) ([]xkcd.Comics, error)
 }
 
 type Stemmer interface {
-	//SliceComicsStem([]xkcd.Comics) (map[string]database.Comics, error)
 	SliceComicsStem(map[string]database.Comics, []xkcd.Comics) error
 }
 
@@ -63,7 +62,7 @@ func (a *App) Run() error {
 	var parsedComics []xkcd.Comics
 	var tAns time.Time
 	if len(dbComics) == 0 || a.CheckMonth(t) {
-		parsedComics, err = a.Parser.FullParse(cntInServer, n)
+		parsedComics, err = a.Parser.FullParse(cntInServer, 1, n)
 		tAns = time.Now()
 	} else {
 		isNotExists := database.CheckComics(dbComics, n)

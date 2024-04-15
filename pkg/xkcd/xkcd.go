@@ -7,9 +7,6 @@ import (
 	"log"
 	"net/http"
 	"sync"
-	"sync/atomic"
-
-	"golang.org/x/sync/errgroup"
 )
 
 var ( // errors
@@ -17,143 +14,177 @@ var ( // errors
 	ErrResponseFromXKCD = errors.New("response status is not 200")
 )
 
+var ( //url
+	urlGetComicsByID = "https://%s/%d/info.0.json"
+	urlGetLastComics = "https://%s/info.0.json"
+)
+
 type XkcdParse struct {
-	URL string
+	URL      string
+	Parallel int
 }
 
-func NewXkcdParse(url string) *XkcdParse {
-	return &XkcdParse{URL: url}
+func NewXkcdParse(url string, parallel int) *XkcdParse {
+	return &XkcdParse{
+		URL:      url,
+		Parallel: parallel,
+	}
 }
 
-func (xp XkcdParse) FullParse(cntInServer, n int) ([]Comics, error) {
-	g := &errgroup.Group{}
-	ans := make([]Comics, n)
-	cntGetted := atomic.Int32{}
-	ch := make(chan Comics)
+type Semaphore struct {
+	ch chan struct{}
+}
+
+func (s *Semaphore) Acquire() {
+	s.ch <- struct{}{}
+}
+
+func (s *Semaphore) Release() {
+	<-s.ch
+}
+
+type ResultWithError struct {
+	Comics Comics
+	Err    error
+}
+
+func (xp XkcdParse) FullParse(cntInServer, start, end int) ([]Comics, error) {
+	n := end - start + 1
+	s := Semaphore{
+		ch: make(chan struct{}, xp.Parallel),
+	}
 	wg := sync.WaitGroup{}
-	wg.Add(1)
-	ReturnArrayAfterWriteFromChan(&wg, &ans, ch, 0)
-	for i := 0; i < n; i++ {
-		i := i
-		//fmt.Println(i)
-		g.Go(func() error {
-			c, err := xp.GetComicsByID(uint(i + 1))
+	outputChan := make(chan ResultWithError, n)
+	signalChan := make(chan struct{})
+	for i := start; i <= min(end, cntInServer); i++ {
+		ID := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.Acquire()
+			defer s.Release()
+			c, err := xp.GetComicsByID(uint(ID))
 			if err != nil {
 				if errors.Is(err, ErrComicsNotFound) {
-					return nil
+					//if lastID < cntInServer {
+					//	lastID++
+					//}
+					outputChan <- ResultWithError{
+						Comics: Comics{},
+						Err:    err,
+					}
 				} else {
-					return fmt.Errorf("error get info about comics with id %d: %w", i+1, err)
-				}
-			}
-			ch <- c
-			cntGetted.Add(1)
-			//ans = append(ans, c)
-			return nil
-		})
-	}
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-	start := n
-	for int(cntGetted.Load()) < n && start < cntInServer {
-		end := start + n - len(ans)
-		for ; start < end; start++ {
-			g.Go(func() error {
-				c, err := xp.GetComicsByID(uint(start + 1))
-				if err != nil {
-					if errors.Is(err, ErrComicsNotFound) {
-						return nil
-					} else {
-						return fmt.Errorf("error get info about comics with id %d: %w", start+1, err)
+					outputChan <- ResultWithError{
+						Comics: Comics{},
+						Err:    fmt.Errorf("error get info about comics with id %d: %w", ID+1, err),
 					}
 				}
-				//ans = append(ans, c)
-				ch <- c
-				cntGetted.Add(1)
-				return nil
-			})
-
-		}
+				return
+			}
+			select {
+			case <-signalChan:
+				return
+			default:
+				outputChan <- ResultWithError{
+					Comics: c,
+					Err:    nil,
+				}
+			}
+		}()
 	}
-	if err := g.Wait(); err != nil {
+	ans, err := xp.ReadInArrayFromChan(&wg, outputChan, signalChan, n)
+	if err != nil {
 		return nil, err
 	}
-	close(ch)
-	wg.Wait()
+	if len(ans) < n {
+		add, err := xp.FullParse(cntInServer, end+1, end+n-len(ans))
+		if err != nil {
+			return nil, err
+		}
+		ans = append(ans, add...)
+	}
 	return ans, nil
 }
 
 func (xp XkcdParse) PartParse(isNotExist []uint, cntInServer, n int) ([]Comics, error) {
-	ans := make([]Comics, len(isNotExist))
-	g := &errgroup.Group{}
-	ch := make(chan Comics)
+	s := Semaphore{
+		ch: make(chan struct{}, xp.Parallel),
+	}
 	wg := sync.WaitGroup{}
-	wg.Add(1)
-	ReturnArrayAfterWriteFromChan(&wg, &ans, ch, 0)
-	cnt := atomic.Int32{}
+	outputChan := make(chan ResultWithError, n)
+	signalChan := make(chan struct{})
 	for _, ID := range isNotExist {
-		ID := ID
-		g.Go(func() error {
-			c, err := xp.GetComicsByID(ID)
+		currID := ID
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.Acquire()
+			defer s.Release()
+			c, err := xp.GetComicsByID(currID)
 			if err != nil {
 				if errors.Is(err, ErrComicsNotFound) {
-					return nil
+					outputChan <- ResultWithError{
+						Comics: Comics{},
+						Err:    err,
+					}
 				} else {
-					return fmt.Errorf("error get info about comics with id %d: %w", ID, err)
-				}
-			}
-			ch <- c
-			cnt.Add(1)
-			return nil
-		})
-
-	}
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-
-	start := n
-	for int(cnt.Load()) < len(isNotExist) {
-		end := n + len(isNotExist) - int(cnt.Load())
-		for ; start < end && start < cntInServer; start++ {
-			start := start
-			g.Go(func() error {
-				c, err := xp.GetComicsByID(uint(start + 1))
-				if err != nil {
-					if errors.Is(err, ErrComicsNotFound) {
-						return nil
-					} else {
-						return fmt.Errorf("error get info about comics with id %d: %w", start+1, err)
+					outputChan <- ResultWithError{
+						Comics: Comics{},
+						Err:    fmt.Errorf("error get info about comics with id %d: %w", currID, err),
 					}
 				}
-				ch <- c
-				cnt.Add(1)
-				return nil
-			})
-		}
+				return
+			}
+			outputChan <- ResultWithError{
+				Comics: c,
+				Err:    nil,
+			}
+		}()
 	}
-	if err := g.Wait(); err != nil {
+	ans, err := xp.ReadInArrayFromChan(&wg, outputChan, signalChan, len(isNotExist))
+	if err != nil {
 		return nil, err
 	}
-
-	close(ch)
-	wg.Wait()
+	if len(ans) < n {
+		add, err := xp.FullParse(cntInServer, n+1, n+len(isNotExist)-len(ans))
+		if err != nil {
+			return nil, err
+		}
+		ans = append(ans, add...)
+	}
 	return ans, nil
 }
 
-func ReturnArrayAfterWriteFromChan(wg *sync.WaitGroup, ans *[]Comics, ch <-chan Comics, i int) {
+func (xp XkcdParse) ReadInArrayFromChan(wg *sync.WaitGroup, outputChan <-chan ResultWithError, signalChan chan<- struct{}, n int) ([]Comics, error) {
+	ans := make([]Comics, 0, n)
+	waitingChan := make(chan struct{})
 	go func() {
-		defer wg.Done()
-		for msg := range ch {
-			(*ans)[i] = msg
-			i++
-		}
+		wg.Wait()
+		waitingChan <- struct{}{}
 	}()
-
+	for i := 0; len(ans) < n; i++ {
+		select {
+		case res, ok := <-outputChan:
+			if !ok {
+				break
+			}
+			if res.Err != nil {
+				if errors.Is(res.Err, ErrComicsNotFound) {
+					continue
+				}
+				close(signalChan)
+				return nil, res.Err
+			}
+			ans = append(ans, res.Comics)
+		case <-waitingChan:
+			break
+		}
+	}
+	return ans, nil
 }
 
 func (xp XkcdParse) GetComicsByID(ID uint) (Comics, error) {
-	resp, err := http.Get(xp.GetURLByID(ID))
+	resp, err := http.Get(fmt.Sprintf(urlGetComicsByID, xp.URL, ID))
 	if err != nil {
 		return Comics{}, err
 	}
@@ -171,12 +202,8 @@ func (xp XkcdParse) GetComicsByID(ID uint) (Comics, error) {
 	return c, nil
 }
 
-func (xp XkcdParse) GetURLByID(ID uint) string {
-	return fmt.Sprintf("https://%s/%d/info.0.json", xp.URL, ID)
-}
-
 func (xp XkcdParse) GetCountComicsInServer() (int, error) {
-	resp, err := http.Get(fmt.Sprintf("https://%s/info.0.json", xp.URL))
+	resp, err := http.Get(fmt.Sprintf(urlGetLastComics, xp.URL))
 	if err != nil {
 		return 0, err
 	}

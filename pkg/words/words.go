@@ -19,7 +19,6 @@ func NewSnowBallStem() *SnowBallStem {
 }
 
 func (sbs SnowBallStem) SliceComicsStem(data map[string]database.Comics, comics []xkcd.Comics) error {
-	//ans := make(map[string]database.Comics, len(comics))
 	for _, c := range comics {
 		cAns, err := sbs.ComicsStem(c)
 		if err != nil {
@@ -29,18 +28,6 @@ func (sbs SnowBallStem) SliceComicsStem(data map[string]database.Comics, comics 
 	}
 	return nil
 }
-
-//func (sbs SnowBallStem) SliceComicsStem(comics []xkcd.Comics) (map[string]database.Comics, error) {
-//	ans := make(map[string]database.Comics, len(comics))
-//	for _, c := range comics {
-//		cAns, err := sbs.ComicsStem(c)
-//		if err != nil {
-//			return nil, fmt.Errorf("error stemming comics with id %d: %w", c.ID, err)
-//		}
-//		ans[fmt.Sprintf("%d", c.ID)] = cAns
-//	}
-//	return ans, nil
-//}
 
 func (sbs SnowBallStem) ComicsStem(comics xkcd.Comics) (database.Comics, error) {
 	cAns := database.Comics{
@@ -59,7 +46,6 @@ func (sbs SnowBallStem) GetWordsFromTranscriptAndAlt(transcript, alt string) []s
 		return !unicode.IsLetter(r) && r != '\''
 	})
 	flag := false
-	//fmt.Println(splitted)
 	for i := len(splitted) - 1; i >= 0; i-- {
 		if splitted[i] == "alt" || splitted[i] == "title" {
 			flag = true
@@ -78,10 +64,6 @@ func (sbs SnowBallStem) GetWordsFromTranscriptAndAlt(transcript, alt string) []s
 	}
 	return splitted
 }
-
-//func (sbs SnowBallStem) HaveAltInTranscript(transcript string) bool {
-//	splitted := strings.Split(transcript, "{{")
-//}
 
 func (sbs SnowBallStem) WordsStem(words []string) ([]string, error) {
 	ans := make([]string, 0, len(words))

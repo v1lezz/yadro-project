@@ -16,7 +16,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	a := app.NewApp(xkcd.NewXkcdParse(cfg.AppCFG.SourceURL),
+	parallel := 10
+	a := app.NewApp(xkcd.NewXkcdParse(cfg.AppCFG.SourceURL, parallel),
 		words.NewSnowBallStem(),
 		database.NewJsonDB(cfg.DBCfg.DBFile),
 		flag_parser.NewFlagParser(),
