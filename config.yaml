@@ -2,3 +2,4 @@ database:
   db_file: "database.json"
 app:
   source_url: "xkcd.com"
+  parallel: 10

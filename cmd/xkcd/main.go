@@ -2,27 +2,26 @@ package main
 
 import (
 	"log"
-	"os"
 	"yadro-project/internal/app"
 	"yadro-project/internal/config"
 	"yadro-project/pkg/database"
-	"yadro-project/pkg/flag_parser"
 	"yadro-project/pkg/words"
 	"yadro-project/pkg/xkcd"
 )
 
 func main() {
-	cfg, err := config.NewConfig("config.yaml")
+	cfg, err := config.NewConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
-	parallel := 10
-	a := app.NewApp(xkcd.NewXkcdParse(cfg.AppCFG.SourceURL, parallel),
+
+	db, err := database.NewJsonDB(cfg.DBCfg.DBFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	a := app.NewApp(xkcd.NewXkcdParse(cfg.AppCFG.SourceURL, cfg.AppCFG.Parallel),
 		words.NewSnowBallStem(),
-		database.NewJsonDB(cfg.DBCfg.DBFile),
-		flag_parser.NewFlagParser(),
-		os.Stdout)
-	defer a.Close()
+		db)
 	if err = a.Run(); err != nil {
 		log.Fatal(err)
 	}
