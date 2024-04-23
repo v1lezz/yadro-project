@@ -6,16 +6,19 @@ import (
 	"fmt"
 	"os"
 	"time"
+	"yadro-project/pkg/pair"
 )
 
 type data struct {
 	LastFullCheck time.Time      `json:"last_full_check"`
+	LastUpdate    time.Time      `json:"last_update"`
 	Comics        map[int]Comics `json:"comics"`
 }
 
 type JsonDB struct {
 	JsonFilePath string
 	Data         data
+	wasChanged   bool
 }
 
 func NewJsonDB(filePath string) (*JsonDB, error) {
@@ -27,9 +30,11 @@ func NewJsonDB(filePath string) (*JsonDB, error) {
 		return &JsonDB{
 			JsonFilePath: filePath,
 			Data: data{
+				LastUpdate:    time.Time{},
 				LastFullCheck: time.Time{},
 				Comics:        make(map[int]Comics),
 			},
+			wasChanged: false,
 		}, nil
 	}
 	file, err := os.Open(filePath)
@@ -52,52 +57,6 @@ func NewJsonDB(filePath string) (*JsonDB, error) {
 
 func (db *JsonDB) GetComics() (map[int]Comics, error) {
 	return db.Data.Comics, nil
-	//flag, err := db.FileIsExist()
-	//if err != nil {
-	//	return nil, time.Time{}, err
-	//}
-	//if !flag {
-	//	return map[string]Comics{}, time.Time{}, nil
-	//}
-	//file, err := os.Open(db.JsonFilePath)
-	//defer file.Close()
-	//if err != nil {
-	//	return nil, time.Time{}, err
-	//}
-	//data := map[string]interface{}{}
-	//
-	//if err = json.NewDecoder(file).Decode(&data); err != nil {
-	//	return nil, time.Time{}, err
-	//}
-	//sTime := data["last_full_check"].(string)
-	//var t time.Time
-	//if err = t.UnmarshalText([]byte(sTime)); err != nil {
-	//	log.Println(fmt.Errorf("error check time of last full check: %w", err))
-	//}
-	//delete(data, "last_full_check")
-	//ans := make(map[string]Comics)
-	//wg := sync.WaitGroup{}
-	//m := sync.Mutex{}
-	//for ID, comics := range data {
-	//	ID := ID
-	//	comics := comics
-	//	wg.Add(1)
-	//	go func() {
-	//		defer wg.Done()
-	//		c, ok := comics.(map[string]interface{})
-	//		if !ok {
-	//			return
-	//		}
-	//		if v, err := NewComics(c); err == nil {
-	//			m.Lock()
-	//			ans[ID] = v
-	//			m.Unlock()
-	//		}
-	//	}()
-	//
-	//}
-	//wg.Wait()
-	//return ans, t, nil
 }
 
 func (db *JsonDB) Add(comics Comics, id int) error {
@@ -105,30 +64,41 @@ func (db *JsonDB) Add(comics Comics, id int) error {
 		return errors.New(fmt.Sprintf("Comics with id %d already exitst", id))
 	}
 	db.Data.Comics[id] = comics
+	db.wasChanged = true
 	return nil
 }
 
-func (db *JsonDB) Save() error {
+func (db *JsonDB) Save(updateTime time.Time) error {
+	if !db.wasChanged {
+		return nil
+	}
+	db.Data.LastUpdate = updateTime
 	file, err := os.OpenFile(db.JsonFilePath, os.O_WRONLY|os.O_CREATE, 0666)
 	defer file.Close()
 	if err != nil {
 		return err
 	}
 	return json.NewEncoder(file).Encode(&db.Data)
-	//ans := make(map[string]interface{})
-	//for ID, comics := range data {
-	//	ans[ID] = comics
-	//}
-	//ans["last_full_check"] = t
-	//file, err := os.OpenFile(db.JsonFilePath, os.O_WRONLY|os.O_CREATE, 0666)
-	//defer file.Close()
-	//if err != nil {
-	//	return err
-	//}
-	//if err = json.NewEncoder(file).Encode(ans); err != nil {
-	//	return err
-	//}
-	//return nil
+}
+
+func (db *JsonDB) GetNumbersOfNMostRelevantComics(n int, keywords []string) ([]int, error) {
+	base := make(map[string]bool, len(keywords))
+	for _, keyword := range keywords {
+		base[keyword] = true
+	}
+	k := make(map[int]int, len(db.Data.Comics))
+	for ID, comics := range db.Data.Comics {
+		cnt := 0
+		for _, keyword := range comics.Keywords {
+			if base[keyword] {
+				cnt++
+			}
+		}
+		if cnt != 0 {
+			k[ID] = cnt
+		}
+	}
+	return pair.GetNRelevantFromMap(k, n), nil
 }
 
 func (db *JsonDB) UpdateLastFullCheckTime(t time.Time) error {
@@ -152,6 +122,18 @@ func (db *JsonDB) GetIDMissingComics(cntInServer int) ([]int, error) {
 		}
 	}
 	return ans, nil
+}
+
+func (db *JsonDB) GetLastUpdateTime() (time.Time, error) {
+	return db.Data.LastUpdate, nil
+}
+
+func (db *JsonDB) GetURLComicsByID(ID int) (string, error) {
+	if val, ok := db.Data.Comics[ID]; ok {
+		return val.ImgURL, nil
+	} else {
+		return "", errors.New("comics not found")
+	}
 }
 
 func FileIsExist(filePath string) (bool, error) {
