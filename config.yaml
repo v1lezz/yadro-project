@@ -1,5 +1,7 @@
 database:
   db_file: "database.json"
+index:
+  index_file: "index.json"
 app:
   source_url: "xkcd.com"
   parallel: 10

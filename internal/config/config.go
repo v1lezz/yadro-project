@@ -1,7 +1,6 @@
 package config
 
 import (
-	"flag"
 	"os"
 
 	"gopkg.in/yaml.v3"
@@ -16,13 +15,21 @@ type AppConfig struct {
 	Parallel  int    `yaml:"parallel"`
 }
 
-type Config struct {
-	DBCfg  DBConfig  `yaml:"database"`
-	AppCFG AppConfig `yaml:"app"`
+type IndexConfig struct {
+	IndexFile string `yaml:"index_file"`
 }
 
-func NewConfig() (Config, error) {
-	file, err := os.Open(ParsePathConfigFile())
+type Config struct {
+	DBCfg    DBConfig    `yaml:"database"`
+	AppCFG   AppConfig   `yaml:"app"`
+	IndexCfg IndexConfig `yaml:"index"`
+}
+
+func NewConfig(c string) (Config, error) {
+	if c == "" {
+		c = "config.yaml"
+	}
+	file, err := os.Open(c)
 	if err != nil {
 		return Config{}, err
 	}
@@ -31,15 +38,6 @@ func NewConfig() (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
-}
-
-func ParsePathConfigFile() string {
-	var c string
-	flag.StringVar(&c, "c", "", "parse file path config")
-	if c == "" {
-		c = "config.yaml"
-	}
-	return c
 }
 
 func (c *Config) SetDefault() {

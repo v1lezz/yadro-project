@@ -79,15 +79,11 @@ func (xp XkcdParse) FullParse(ctx context.Context, cntInServer int) ([]Comics, e
 				outputChan <- ResultWithError{Err: fmt.Errorf("error get info about comics with id %d: %w", ID+1, err)}
 				return
 			}
-			//select {
-			//case <-signalChan:
-			//	return
-			//default:
 			outputChan <- ResultWithError{
 				Comics: c,
 				Err:    nil,
 			}
-			//}
+
 		}()
 	}
 	ans, err := xp.ReadInArrayFromChan(outputChan, cntInServer)
