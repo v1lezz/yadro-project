@@ -1,40 +1,105 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"fmt"
 	"log"
-	"yadro-project/internal/app"
+	"net"
+	"net/http"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
+	"yadro-project/internal/adapters/handler"
+	"yadro-project/internal/adapters/index"
+	"yadro-project/internal/adapters/repository"
 	"yadro-project/internal/config"
-	"yadro-project/pkg/database"
-	"yadro-project/pkg/index"
+	"yadro-project/internal/core/services"
 	"yadro-project/pkg/words"
 	"yadro-project/pkg/xkcd"
 )
 
 func main() {
-	var cfgPath, s string
-	var i bool
+	var cfgPath string
 	flag.StringVar(&cfgPath, "c", "", "parse file path config")
-	flag.StringVar(&s, "s", "", "parse string for search")
-	flag.BoolVar(&i, "i", false, "use index for search")
+	//flag.StringVar(&s, "s", "", "parse string for search")
+	//flag.BoolVar(&i, "i", false, "use index for search")
 	flag.Parse()
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGHUP)
+	defer cancel()
 	cfg, err := config.NewConfig(cfgPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	db, err := database.NewJsonDB(cfg.DBCfg.DBFile)
+	db, err := repository.NewJsonDB(cfg.DbCFG.DBFile)
 	if err != nil {
 		log.Fatal(err)
 	}
-	idx, err := index.NewFileIndex(cfg.IndexCfg)
+	idx, err := index.NewFileIndex(cfg.IndexCFG)
 	if err != nil {
 		log.Fatal(err)
 	}
-	a := app.NewApp(xkcd.NewXkcdParse(cfg.AppCFG.SourceURL, cfg.AppCFG.Parallel),
-		words.NewSnowBallStem(),
-		db, idx)
-	if err = a.Run(s, i); err != nil {
-		log.Fatal(err)
+	stemmer := words.NewSnowBallStem()
+	parser := xkcd.NewXkcdParse(cfg.AppCFG.SourceURL, cfg.AppCFG.Parallel, stemmer)
+	svc := services.NewComicsService(db, parser, idx, stemmer)
+	mutex := &sync.Mutex{}
+	srv := NewServer(ctx, *svc, mutex, fmt.Sprintf(":%d", cfg.SrvCFG.Port))
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	go func() {
+		if err = srv.ListenAndServe(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+	go func() {
+		<-ctx.Done()
+		ctx, cancel = context.WithTimeout(context.Background(), time.Second*30)
+		defer cancel()
+		for {
+			select {
+			case <-ctx.Done():
+				break
+			default:
+			}
+			if mutex.TryLock() {
+				mutex.Unlock()
+				break
+			}
+		}
+		if err = srv.Shutdown(ctx); err != nil {
+			log.Fatal(err)
+		}
+
+	}()
+
+}
+
+func NewServer(ctx context.Context, svc services.ComicsService, mutex *sync.Mutex, addr string) *http.Server {
+	router := http.NewServeMux()
+	c := handler.NewComicsHandler(svc, mutex)
+	router.HandleFunc("GET /pics", c.GetComics)
+	router.HandleFunc("POST /update", c.UpdateComics)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Hour * 24):
+				if mutex.TryLock() {
+					_, _ = svc.UpdateComics(ctx)
+					mutex.Unlock()
+				}
+			}
+		}
+	}()
+	return &http.Server{
+		Addr:    addr,
+		Handler: router,
+		BaseContext: func(_ net.Listener) context.Context {
+			return ctx
+		},
 	}
+
 }

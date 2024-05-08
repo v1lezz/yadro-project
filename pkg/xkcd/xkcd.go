@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"yadro-project/internal/core/domain"
+	"yadro-project/internal/core/ports"
 )
 
 var ( // errors
@@ -17,19 +19,44 @@ var ( // errors
 
 var ( //url
 	urlGetComicsByID = "https://%s/%d/info.0.json"
-	urlGetLastComics = "https://%s/info.0.json"
 )
 
 type XkcdParse struct {
 	URL      string
 	Parallel int
+	Stemmer  ports.Stemmer
 }
 
-func NewXkcdParse(url string, parallel int) *XkcdParse {
+func NewXkcdParse(url string, parallel int, stemmer ports.Stemmer) *XkcdParse {
 	return &XkcdParse{
 		URL:      url,
 		Parallel: parallel,
+		Stemmer:  stemmer,
 	}
+}
+
+func (xp *XkcdParse) stemSliceComics(parsedComics []Comics) ([]domain.Comics, error) {
+	ans := make([]domain.Comics, 0, len(parsedComics))
+	for _, comics := range parsedComics {
+		cAns, err := xp.stemComics(comics)
+		if err == nil {
+			ans = append(ans, cAns)
+		}
+	}
+	return ans, nil
+}
+
+func (xp *XkcdParse) stemComics(comics Comics) (domain.Comics, error) {
+	cAns := domain.Comics{
+		ID:     comics.ID,
+		ImgURL: comics.ImgURL,
+	}
+	keywords, err := xp.Stemmer.Stem(comics.GetWordsFromTranscriptAndAlt())
+	if err != nil {
+		return domain.Comics{}, fmt.Errorf("error stem comics with id %d:%w", comics.ID, err)
+	}
+	cAns.Keywords = keywords
+	return cAns, nil
 }
 
 type Semaphore struct {
@@ -49,18 +76,14 @@ type ResultWithError struct {
 	Err    error
 }
 
-func (xp XkcdParse) FullParse(ctx context.Context, cntInServer int) ([]Comics, error) {
+func (xp *XkcdParse) FullParse(ctx context.Context, cntInServer int) ([]domain.Comics, error) {
 	s := Semaphore{
 		ch: make(chan struct{}, xp.Parallel),
 	}
-	//wg := sync.WaitGroup{}
 	outputChan := make(chan ResultWithError, cntInServer)
-	//signalChan := make(chan struct{})
 	for i := 1; i <= cntInServer; i++ {
 		ID := i
-		//wg.Add(1)
 		go func() {
-			//defer wg.Done()
 			s.Acquire()
 			defer s.Release()
 			select {
@@ -91,10 +114,10 @@ func (xp XkcdParse) FullParse(ctx context.Context, cntInServer int) ([]Comics, e
 	if err != nil {
 		return nil, err
 	}
-	return ans, nil
+	return xp.stemSliceComics(ans)
 }
 
-func (xp XkcdParse) PartParse(ctx context.Context, isNotExist []int) ([]Comics, error) {
+func (xp *XkcdParse) PartParse(ctx context.Context, isNotExist []int) ([]domain.Comics, error) {
 	s := Semaphore{
 		ch: make(chan struct{}, xp.Parallel),
 	}
@@ -131,10 +154,10 @@ func (xp XkcdParse) PartParse(ctx context.Context, isNotExist []int) ([]Comics, 
 	if err != nil {
 		return nil, err
 	}
-	return ans, nil
+	return xp.stemSliceComics(ans)
 }
 
-func (xp XkcdParse) ReadInArrayFromChan(outputChan <-chan ResultWithError, n int) ([]Comics, error) {
+func (xp *XkcdParse) ReadInArrayFromChan(outputChan <-chan ResultWithError, n int) ([]Comics, error) {
 	ans := make([]Comics, 0, n)
 	for i := 0; i < n; i++ {
 		res, ok := <-outputChan
@@ -149,7 +172,7 @@ func (xp XkcdParse) ReadInArrayFromChan(outputChan <-chan ResultWithError, n int
 	return ans, nil
 }
 
-func (xp XkcdParse) GetComicsByID(ID int) (Comics, error) {
+func (xp *XkcdParse) GetComicsByID(ID int) (Comics, error) {
 	resp, err := http.Get(fmt.Sprintf(urlGetComicsByID, xp.URL, ID))
 	if err != nil {
 		return Comics{}, err
@@ -168,7 +191,7 @@ func (xp XkcdParse) GetComicsByID(ID int) (Comics, error) {
 	return c, nil
 }
 
-func (xp XkcdParse) GetCountComicsInServer(ctx context.Context) (int, error) {
+func (xp *XkcdParse) GetCountComicsInServer(ctx context.Context) (int, error) {
 	start := 1
 	end := 100
 	for ; ; start, end = end, end+100 {
@@ -195,7 +218,7 @@ func (xp XkcdParse) GetCountComicsInServer(ctx context.Context) (int, error) {
 	return end - 1, nil
 }
 
-func (xp XkcdParse) IsNotFoundComics(ID int, isMain bool) (bool, error) {
+func (xp *XkcdParse) IsNotFoundComics(ID int, isMain bool) (bool, error) {
 	_, err := xp.GetComicsByID(ID)
 	if err != nil {
 		if errors.Is(err, ErrComicsNotFound) {
@@ -216,30 +239,3 @@ func (xp XkcdParse) IsNotFoundComics(ID int, isMain bool) (bool, error) {
 	}
 	return false, nil
 }
-
-//func (xp XkcdParse) GetCountComicsInServer(ctx context.Context) (int, error) {
-//	resp, err := http.Get(fmt.Sprintf(urlGetLastComics, xp.URL))
-//	if err != nil {
-//		return 0, err
-//	}
-//	defer resp.Body.Close()
-//	if resp.StatusCode != http.StatusOK {
-//		return 0, ErrResponseFromXKCD
-//	}
-//	data := map[string]interface{}{}
-//	if err = json.NewDecoder(resp.Body).Decode(&data); err != nil {
-//		return 0, fmt.Errorf("error decode json: %w", err)
-//	}
-//	return getNumberFromField(data, "num")
-//}
-//
-//func getNumberFromField(data map[string]interface{}, fieldName string) (int, error) {
-//	if iNum, ok := data[fieldName]; ok {
-//		if num, ok := iNum.(float64); ok {
-//			return int(num), nil
-//		}
-//		log.Println(data["num"])
-//		return 0, errors.New(fmt.Sprintf("field \"%s\" is not a number", fieldName))
-//	}
-//	return 0, errors.New(fmt.Sprintf("field \"%s\" is not exist", fieldName))
-//}
