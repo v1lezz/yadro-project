@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 	"time"
+	"yadro-project/internal/adapters/repository"
 	"yadro-project/internal/config"
-	"yadro-project/pkg/database"
 	"yadro-project/pkg/pair"
 )
 
@@ -29,7 +29,7 @@ func NewFileIndex(cfg config.IndexConfig) (*FileIndex, error) {
 		},
 		wasChanged: false,
 	}
-	flag, err := database.FileIsExist(cfg.IndexFile)
+	flag, err := repository.FileIsExist(cfg.IndexFile)
 	if err != nil {
 		return nil, err
 	}

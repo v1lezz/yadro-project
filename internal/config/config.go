@@ -19,10 +19,15 @@ type IndexConfig struct {
 	IndexFile string `yaml:"index_file"`
 }
 
+type ServerConfig struct {
+	Port int `yaml:"port"`
+}
+
 type Config struct {
-	DBCfg    DBConfig    `yaml:"database"`
-	AppCFG   AppConfig   `yaml:"app"`
-	IndexCfg IndexConfig `yaml:"index"`
+	DbCFG    DBConfig     `yaml:"database"`
+	AppCFG   AppConfig    `yaml:"app"`
+	IndexCFG IndexConfig  `yaml:"index"`
+	SrvCFG   ServerConfig `yaml:"server"`
 }
 
 func NewConfig(c string) (Config, error) {
@@ -42,7 +47,9 @@ func NewConfig(c string) (Config, error) {
 
 func (c *Config) SetDefault() {
 	c.AppCFG.SetDefault()
-	c.DBCfg.SetDefault()
+	c.DbCFG.SetDefault()
+	c.IndexCFG.SetDefault()
+	c.SrvCFG.SetDefault()
 }
 
 func (c *DBConfig) SetDefault() {
@@ -54,5 +61,17 @@ func (c *DBConfig) SetDefault() {
 func (c *AppConfig) SetDefault() {
 	if c.SourceURL == "" {
 		c.SourceURL = "xkcd.com"
+	}
+}
+
+func (c *IndexConfig) SetDefault() {
+	if c.IndexFile == "" {
+		c.IndexFile = "index.json"
+	}
+}
+
+func (c *ServerConfig) SetDefault() {
+	if c.Port == 0 {
+		c.Port = 9000
 	}
 }

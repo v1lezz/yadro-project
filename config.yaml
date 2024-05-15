@@ -5,3 +5,5 @@ index:
 app:
   source_url: "xkcd.com"
   parallel: 10
+server:
+  port: 9000
