@@ -57,7 +57,7 @@ func (srv *ComicsService) searchComics(ctx context.Context, n int, keywords []st
 		return nil, ErrContextDone
 	default:
 	}
-	idxLastUpdate, err := srv.indexer.GetLastUpdateTime()
+	idxLastUpdate, err := srv.indexer.GetLastUpdateTime(ctx)
 	if err != nil {
 		comics, err := srv.searchComicsFromRepository(ctx, n, keywords)
 		if err != nil {
@@ -76,7 +76,7 @@ func (srv *ComicsService) searchComics(ctx context.Context, n int, keywords []st
 		}
 		return comics, nil
 	}
-	indexes, err := srv.indexer.GetNumbersOfNMostRelevantComics(n, keywords)
+	indexes, err := srv.indexer.GetNumbersOfNMostRelevantComics(ctx, n, keywords)
 	if err != nil {
 		comics, err := srv.searchComicsFromRepository(ctx, n, keywords)
 		if err != nil {
@@ -184,11 +184,11 @@ func (srv *ComicsService) UpdateComics(ctx context.Context) (domain.UpdateMeta, 
 		updateTime = time.Now()
 	}
 
-	if err = srv.repo.Save(ctx, updateTime); err != nil {
+	if err = srv.repo.Close(ctx, updateTime); err != nil {
 		return domain.UpdateMeta{}, fmt.Errorf("error save comics in storage: %w", err)
 	}
 
-	if err = srv.indexer.Save(updateTime); err != nil {
+	if err = srv.indexer.Save(ctx, updateTime); err != nil {
 		return domain.UpdateMeta{}, fmt.Errorf("error save comics in storage: %w", err)
 	}
 
@@ -199,7 +199,7 @@ func (srv *ComicsService) UpdateComics(ctx context.Context) (domain.UpdateMeta, 
 }
 
 func (srv *ComicsService) updateIndex(ctx context.Context, parsedComics []domain.Comics) error {
-	idxTime, err := srv.indexer.GetLastUpdateTime()
+	idxTime, err := srv.indexer.GetLastUpdateTime(ctx)
 	if err != nil {
 		return fmt.Errorf("error get last update of index: %w", err)
 	}
@@ -214,13 +214,13 @@ func (srv *ComicsService) updateIndex(ctx context.Context, parsedComics []domain
 		if err != nil {
 			return fmt.Errorf("error get comics from repository: %w", err)
 		}
-		if err = srv.indexer.Clear(); err != nil {
+		if err = srv.indexer.Clear(ctx); err != nil {
 			return fmt.Errorf("error clear index: %w", err)
 		}
 	}
 
 	for _, comics := range parsedComics {
-		if err = srv.indexer.UpdateIndex(comics.ID, comics.Keywords); err != nil {
+		if err = srv.indexer.UpdateIndex(ctx, comics.ID, comics.Keywords); err != nil {
 			return fmt.Errorf("error update index: %w", err)
 		}
 	}

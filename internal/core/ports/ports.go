@@ -2,8 +2,13 @@ package ports
 
 import (
 	"context"
+	"errors"
 	"time"
 	"yadro-project/internal/core/domain"
+)
+
+var ( //errors
+	ErrIsNotExist = errors.New("is not exist")
 )
 
 type ComicsRepository interface {
@@ -11,7 +16,7 @@ type ComicsRepository interface {
 	GetCountComics(ctx context.Context) (int, error)
 	GetIDMissingComics(ctx context.Context, cntInServer int) ([]int, error)
 	Add(ctx context.Context, comics domain.Comics, id int) error
-	Save(ctx context.Context, updateTime time.Time) error
+	Close(ctx context.Context, updateTime time.Time) error
 	GetLastFullCheckTime(ctx context.Context) (time.Time, error)
 	UpdateLastFullCheckTime(ctx context.Context, updateTime time.Time) error
 	GetLastUpdateTime(ctx context.Context) (time.Time, error)

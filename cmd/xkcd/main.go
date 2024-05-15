@@ -33,11 +33,21 @@ func main() {
 		log.Fatal(err)
 	}
 
-	db, err := repository.NewJsonDB(cfg.DbCFG.DBFile)
+	//db, err := repository.NewJsonDB(cfg.DbCFG.DBFile)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	db, err := repository.NewPostgresConn(ctx, cfg.DbCFG)
 	if err != nil {
 		log.Fatal(err)
 	}
-	idx, err := index.NewFileIndex(cfg.IndexCFG)
+
+	//idx, err := index.NewFileIndex(cfg.IndexCFG)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+
+	idx, err := index.NewPostgresConn(ctx, cfg.DbCFG)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -53,26 +63,13 @@ func main() {
 			log.Fatal(err)
 		}
 	}()
-	go func() {
-		<-ctx.Done()
-		ctx, cancel = context.WithTimeout(context.Background(), time.Second*30)
-		defer cancel()
-		for {
-			select {
-			case <-ctx.Done():
-				break
-			default:
-			}
-			if mutex.TryLock() {
-				mutex.Unlock()
-				break
-			}
-		}
-		if err = srv.Shutdown(ctx); err != nil {
-			log.Fatal(err)
-		}
-
-	}()
+	<-ctx.Done()
+	mutex.Lock()
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	if err = srv.Shutdown(ctx); err != nil {
+		log.Fatal(err)
+	}
 
 }
 

@@ -30,7 +30,7 @@ var (
 func (h *ComicsHandler) GetComics(w http.ResponseWriter, r *http.Request) {
 	queries := r.URL.Query()
 	search := queries.Get("search")
-	if search != "" {
+	if search == "" {
 		HandleError(w, http.StatusBadRequest, errQueryIsEmpty)
 		return
 	}
@@ -46,11 +46,7 @@ func (h *ComicsHandler) GetComics(w http.ResponseWriter, r *http.Request) {
 	for i := 0; i < len(comics); i++ {
 		comics[i].Keywords = nil
 	}
-	if err = json.NewEncoder(w).Encode(comics); err != nil {
-		HandleError(w, http.StatusInternalServerError, errEncodeJSON)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(comics)
 }
 
 func (h *ComicsHandler) UpdateComics(w http.ResponseWriter, r *http.Request) {
@@ -63,14 +59,10 @@ func (h *ComicsHandler) UpdateComics(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, services.ErrContextDone) {
 			HandleError(w, http.StatusServiceUnavailable, err)
-		} else {
-			HandleError(w, http.StatusInternalServerError, fmt.Errorf("error update comics: %w", err))
+			return
 		}
+		HandleError(w, http.StatusInternalServerError, fmt.Errorf("error update comics: %w", err))
 		return
 	}
-	if err = json.NewEncoder(w).Encode(meta); err != nil {
-		HandleError(w, http.StatusInternalServerError, errEncodeJSON)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(meta)
 }
