@@ -2,7 +2,7 @@
 -- +goose StatementBegin
 CREATE TABLE comics (
     id INTEGER PRIMARY KEY,
-    image_url VARCHAR(255) NOT NULL,
+    image_url VARCHAR(255) NOT NULL
 );
 
 CREATE TABLE keyword (
@@ -24,13 +24,13 @@ CREATE TABLE index (
 
 CREATE TABLE time (
     id SERIAL PRIMARY KEY,
-    update_time_comics TIME NOT NULL,
-    update_time_index TIME NOT NULL,
-    last_full_check_time TIME NOT NULL
+    update_time_comics TIMESTAMP NOT NULL,
+    update_time_index TIMESTAMP NOT NULL,
+    last_full_check_time TIMESTAMP NOT NULL
 );
 
-INSERT INTO time(update_time, update_time_index, last_full_check_time) VALUES
-(0,0,0);
+INSERT INTO time(update_time_comics, update_time_index, last_full_check_time) VALUES
+('2000-01-01 00:00:00','2000-01-01 00:00:00','2000-01-01 00:00:00');
 -- +goose StatementEnd
 
 -- +goose Down

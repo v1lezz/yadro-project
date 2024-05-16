@@ -1,7 +1,7 @@
 database:
   user: "v1lezz"
   password: 1234
-  host: "localhost"
+  host: "db"
   port: 5432
   database: comics
 index:

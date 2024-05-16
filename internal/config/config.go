@@ -14,7 +14,7 @@ type JsonDBConfig struct {
 type PostgresDBConfig struct {
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
-	Host     string `yaml:"port"`
+	Host     string `yaml:"host"`
 	Port     int    `yaml:"port"`
 	Database string `yaml:"database"`
 }
