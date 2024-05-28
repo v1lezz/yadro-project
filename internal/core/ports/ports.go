@@ -8,6 +8,7 @@ import (
 )
 
 var ( //errors
+	ErrIsExist    = errors.New("is exist")
 	ErrIsNotExist = errors.New("is not exist")
 )
 

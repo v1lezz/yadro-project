@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -11,8 +10,8 @@ import (
 	"yadro-project/internal/core/domain"
 	"yadro-project/internal/core/ports"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"golang.org/x/sync/errgroup"
 )
 
 type PostgresConn struct {
@@ -30,7 +29,7 @@ func NewPostgresConn(ctx context.Context, cfg config.PostgresDBConfig) (*Postgre
 		return nil, fmt.Errorf("error create new postgres pool")
 	}
 
-	if err = migrations.Up(pool, "/server/internal/adapters/repository/migrations"); err != nil {
+	if err = migrations.Up(pool, "/server"); err != nil {
 		return nil, fmt.Errorf("error up migrations: %w", err)
 	}
 
@@ -101,7 +100,7 @@ func (pg *PostgresConn) GetCountComics(ctx context.Context) (int, error) {
 	row := pg.pool.QueryRow(ctx, getCountComics)
 	cnt := 0
 	if err := row.Scan(&cnt); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return 0, nil
 		}
 		return 0, fmt.Errorf("error get count comics: %w", err)
@@ -150,7 +149,7 @@ func (pg *PostgresConn) comicsIsExist(ctx context.Context, id int) (bool, error)
 	row := pg.pool.QueryRow(ctx, comicsIsExist, id)
 
 	if err := row.Scan(new(int)); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return false, nil
 		}
 		return false, fmt.Errorf("error check comics is exist: %w", err)
@@ -170,8 +169,8 @@ func (pg *PostgresConn) Add(ctx context.Context, comics domain.Comics, id int) e
 		return err
 	}
 
-	if !isExist {
-		return ports.ErrIsNotExist
+	if isExist {
+		return ports.ErrIsExist
 	}
 
 	tx, err := pg.pool.Begin(ctx)
@@ -184,22 +183,14 @@ func (pg *PostgresConn) Add(ctx context.Context, comics domain.Comics, id int) e
 		return fmt.Errorf("error insert comics: %w", err)
 	}
 
-	g, gCtx := errgroup.WithContext(ctx)
-
 	for _, keyword := range comics.Keywords {
-		g.Go(func() error {
-			if _, err := tx.Exec(gCtx, insertKeyword, keyword); err != nil {
-				return err
-			}
-			if _, err := tx.Exec(gCtx, insertComicsKeyword, comics.ID, keyword); err != nil {
-				return err
-			}
-			return nil
-		})
-	}
+		if _, err := tx.Exec(ctx, insertKeyword, keyword); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, insertComicsKeyword, comics.ID, keyword); err != nil {
+			return err
+		}
 
-	if err := g.Wait(); err != nil {
-		return fmt.Errorf("error add keyword: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -225,14 +216,12 @@ func (pg *PostgresConn) GetLastFullCheckTime(ctx context.Context) (time.Time, er
 
 	t := time.Time{}
 	if err := row.Scan(&t); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return time.Time{}, ports.ErrIsNotExist
 		}
 		return time.Time{}, fmt.Errorf("error get last update time: %w", err)
 	}
-
 	return t, nil
-
 }
 
 const updateLastFullCheckTime = `UPDATE time SET last_full_check_time = $1 WHERE id = 1`
@@ -251,7 +240,7 @@ func (pg *PostgresConn) GetLastUpdateTime(ctx context.Context) (time.Time, error
 
 	t := time.Time{}
 	if err := row.Scan(&t); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return time.Time{}, ports.ErrIsNotExist
 		}
 		return time.Time{}, fmt.Errorf("error get last update time: %w", err)
@@ -267,7 +256,7 @@ func (pg *PostgresConn) GetURLComicsByID(ctx context.Context, ID int) (string, e
 
 	var url string
 	if err := row.Scan(&url); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return "", ports.ErrIsNotExist
 		}
 		return "", fmt.Errorf("error get url comics by id: %w", err)

@@ -2,7 +2,6 @@ package index
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -10,8 +9,8 @@ import (
 	"yadro-project/internal/core/ports"
 	"yadro-project/pkg/pair"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"golang.org/x/sync/errgroup"
 )
 
 type PostgresConn struct {
@@ -42,7 +41,7 @@ func (pg *PostgresConn) GetNumbersOfNMostRelevantComics(ctx context.Context, n i
 	if err != nil {
 		return nil, err
 	}
-
+	defer rows.Close()
 	k := make(map[string][]int)
 
 	var temp string
@@ -55,8 +54,6 @@ func (pg *PostgresConn) GetNumbersOfNMostRelevantComics(ctx context.Context, n i
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("rows error: %w", err)
 	}
-
-	rows.Close()
 
 	for keyword, _ := range k {
 		rows, err = pg.pool.Query(ctx, getComics, keyword)
@@ -98,29 +95,20 @@ func (pg *PostgresConn) UpdateIndex(ctx context.Context, id int, keywords []stri
 	}
 	defer tx.Rollback(ctx)
 
-	g, gCtx := errgroup.WithContext(ctx)
 	for _, keyword := range keywords {
-		g.Go(func() error {
-			if _, err := tx.Exec(gCtx, insertKeyword, keyword); err != nil {
-				return err
-			}
-
-			if _, err := tx.Exec(gCtx, insertKeywordComics, keyword, id); err != nil {
-				return err
-			}
-			return nil
-		})
+		if _, err := tx.Exec(ctx, insertKeyword, keyword); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, insertKeywordComics, keyword, id); err != nil {
+			return err
+		}
 	}
 
-	if err := g.Wait(); err != nil {
+	if err = tx.Commit(ctx); err != nil {
 		return err
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return err
-	}
-
-	return err
+	return nil
 }
 
 const updateLastUpdateTime = `UPDATE time SET update_time_index = $1 WHERE id = 1`
@@ -140,7 +128,7 @@ func (pg *PostgresConn) GetLastUpdateTime(ctx context.Context) (time.Time, error
 
 	t := time.Time{}
 	if err := row.Scan(&t); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return time.Time{}, ports.ErrIsNotExist
 		}
 		return time.Time{}, fmt.Errorf("error get last update time: %w", err)
