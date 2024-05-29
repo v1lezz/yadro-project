@@ -1,13 +1,26 @@
 package config
 
 import (
+	"fmt"
 	"os"
 
 	"gopkg.in/yaml.v3"
 )
 
-type DBConfig struct {
+type JsonDBConfig struct {
 	DBFile string `yaml:"db_file"`
+}
+
+type PostgresDBConfig struct {
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	Database string `yaml:"database"`
+}
+
+func (cfg PostgresDBConfig) String() string {
+	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s", cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Database)
 }
 
 type AppConfig struct {
@@ -24,10 +37,10 @@ type ServerConfig struct {
 }
 
 type Config struct {
-	DbCFG    DBConfig     `yaml:"database"`
-	AppCFG   AppConfig    `yaml:"app"`
-	IndexCFG IndexConfig  `yaml:"index"`
-	SrvCFG   ServerConfig `yaml:"server"`
+	DbCFG    PostgresDBConfig `yaml:"database"`
+	AppCFG   AppConfig        `yaml:"app"`
+	IndexCFG IndexConfig      `yaml:"index"`
+	SrvCFG   ServerConfig     `yaml:"server"`
 }
 
 func NewConfig(c string) (Config, error) {
@@ -47,15 +60,8 @@ func NewConfig(c string) (Config, error) {
 
 func (c *Config) SetDefault() {
 	c.AppCFG.SetDefault()
-	c.DbCFG.SetDefault()
 	c.IndexCFG.SetDefault()
 	c.SrvCFG.SetDefault()
-}
-
-func (c *DBConfig) SetDefault() {
-	if c.DBFile == "" {
-		c.DBFile = "database.json"
-	}
 }
 
 func (c *AppConfig) SetDefault() {

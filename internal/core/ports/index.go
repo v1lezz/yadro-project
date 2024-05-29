@@ -1,11 +1,14 @@
 package ports
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 type Indexer interface {
-	GetNumbersOfNMostRelevantComics(n int, keywords []string) ([]int, error)
-	UpdateIndex(id int, keywords []string) error
-	Save(updateTime time.Time) error
-	GetLastUpdateTime() (time.Time, error)
-	Clear() error
+	GetNumbersOfNMostRelevantComics(ctx context.Context, n int, keywords []string) ([]int, error)
+	UpdateIndex(ctx context.Context, id int, keywords []string) error
+	Save(ctx context.Context, updateTime time.Time) error
+	GetLastUpdateTime(ctx context.Context) (time.Time, error)
+	Clear(ctx context.Context) error
 }

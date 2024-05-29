@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16.2
+    user: postgres
+    restart: always
+    networks:
+      - xkcd_net
+    environment:
+      - POSTGRES_USER=v1lezz
+      - POSTGRES_PASSWORD=1234
+      - POSTGRES_DB=comics
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d comics -U postgres"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - xkcd_data:/var/lib/postgresql/chat_data
+  server:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    restart: always
+    ports:
+      - "9000:9000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - xkcd_net
+
+volumes:
+  xkcd_data:
+
+networks:
+  xkcd_net:
+    driver: bridge

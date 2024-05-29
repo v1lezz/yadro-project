@@ -77,7 +77,7 @@ func (db *JsonDB) Add(ctx context.Context, comics domain.Comics, id int) error {
 	return nil
 }
 
-func (db *JsonDB) Save(ctx context.Context, updateTime time.Time) error {
+func (db *JsonDB) Close(ctx context.Context, updateTime time.Time) error {
 	if !db.wasChanged {
 		return nil
 	}
