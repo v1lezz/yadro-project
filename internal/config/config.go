@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -33,7 +34,13 @@ type IndexConfig struct {
 }
 
 type ServerConfig struct {
-	Port int `yaml:"port"`
+	Port             int `yaml:"port"`
+	ConcurrencyLimit int `yaml:"concurrency_limit"`
+	RateLimit        int `yaml:"rate_limit"`
+}
+
+type AuthConfig struct {
+	TokenMaxTime time.Duration `yaml:"token_max_time"`
 }
 
 type Config struct {
@@ -41,6 +48,7 @@ type Config struct {
 	AppCFG   AppConfig        `yaml:"app"`
 	IndexCFG IndexConfig      `yaml:"index"`
 	SrvCFG   ServerConfig     `yaml:"server"`
+	AuthCFG  AuthConfig       `yaml:"auth"`
 }
 
 func NewConfig(c string) (Config, error) {
@@ -79,5 +87,17 @@ func (c *IndexConfig) SetDefault() {
 func (c *ServerConfig) SetDefault() {
 	if c.Port == 0 {
 		c.Port = 9000
+	}
+	if c.ConcurrencyLimit == 0 {
+		c.ConcurrencyLimit = 10
+	}
+	if c.RateLimit == 0 {
+		c.RateLimit = 0
+	}
+}
+
+func (c *AuthConfig) SetDefault() {
+	if c.TokenMaxTime == 0 {
+		c.TokenMaxTime = time.Second * 10
 	}
 }

@@ -19,3 +19,8 @@ type UpdateMeta struct {
 func (c Comics) String() string {
 	return fmt.Sprintf("ID: %d\nimg_url: %s\nkeywords: \"%s\"", c.ID, c.ImgURL, strings.Join(c.Keywords, "\", \""))
 }
+
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}

@@ -23,8 +23,6 @@ import (
 func main() {
 	var cfgPath string
 	flag.StringVar(&cfgPath, "c", "", "parse file path config")
-	//flag.StringVar(&s, "s", "", "parse string for search")
-	//flag.BoolVar(&i, "i", false, "use index for search")
 	flag.Parse()
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGHUP)
 	defer cancel()
@@ -33,20 +31,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	//db, err := repository.NewJsonDB(cfg.DbCFG.DBFile)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
 	db, err := repository.NewPostgresConn(ctx, cfg.DbCFG)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	//idx, err := index.NewFileIndex(cfg.IndexCFG)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-
 	idx, err := index.NewPostgresConn(ctx, cfg.DbCFG)
 	if err != nil {
 		log.Fatal(err)
@@ -78,6 +66,7 @@ func NewServer(ctx context.Context, svc services.ComicsService, mutex *sync.Mute
 	c := handler.NewComicsHandler(svc, mutex)
 	router.HandleFunc("GET /pics", c.GetComics)
 	router.HandleFunc("POST /update", c.UpdateComics)
+	router.HandleFunc("POST /login", nil)
 	go func() {
 		for {
 			select {

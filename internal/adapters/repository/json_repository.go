@@ -144,14 +144,3 @@ func (db *JsonDB) GetURLComicsByID(ctx context.Context, ID int) (string, error) 
 		return "", errors.New("comics not found")
 	}
 }
-
-func FileIsExist(filePath string) (bool, error) {
-	_, err := os.Stat(filePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
-}

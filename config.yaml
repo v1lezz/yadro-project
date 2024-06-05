@@ -11,3 +11,7 @@ app:
   parallel: 10
 server:
   port: 9000
+  concurrency_limit: 10
+  rate_limit: 10
+auth:
+  token_max_time: 10m
