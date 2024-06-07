@@ -56,6 +56,14 @@ func (svc *AuthService) Login(request domain.LoginRequest) (string, error) {
 }
 
 func (svc *AuthService) CheckToken(sToken string) (bool, error) {
+	email, err := svc.GetEmailFromToken(sToken)
+	if err != nil {
+		return false, err
+	}
+	return svc.repo.CheckUserByEmail(email)
+}
+
+func (svc *AuthService) GetEmailFromToken(sToken string) (string, error) {
 	t, err := jwt.Parse(sToken, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -64,18 +72,16 @@ func (svc *AuthService) CheckToken(sToken string) (bool, error) {
 	})
 
 	if err != nil {
-		return false, fmt.Errorf("error parse token: %w", err)
+		return "", fmt.Errorf("error parse token: %w", err)
 	}
 
 	if !t.Valid {
-		return false, ErrTokenInvalid
+		return "", ErrTokenInvalid
 	}
 
 	sub, err := t.Claims.GetSubject()
 	if err != nil {
-		return false, fmt.Errorf("error get sub from token: %w", err)
+		return "", fmt.Errorf("error get sub from token: %w", err)
 	}
-	return svc.repo.CheckUserByEmail(sub)
+	return sub, nil
 }
-
-func (svc *AuthService)

@@ -2,42 +2,34 @@ package handler
 
 import (
 	"net/http"
-
-	"go.uber.org/ratelimit"
+	"yadro-project/internal/core/services"
 )
 
-type Semaphore struct {
-	ch chan struct{}
-}
-
-func (s *Semaphore) Acquire() {
-	s.ch <- struct{}{}
-}
-
-func (s *Semaphore) Release() {
-	<-s.ch
-}
-
-func NewSemaphore(limit int) Semaphore {
-	return Semaphore{
-		ch: make(chan struct{}, limit),
-	}
-}
-
 type LimitHandler struct {
-	rl ratelimit.Limiter
-	cl Semaphore
+	limitService services.LimitService
+	authService  services.AuthService
 }
 
-func NewLimitHandler(rateLimit, concurrencyLimit int) *LimitHandler {
+func NewLimitHandler(limitService services.LimitService, authService services.AuthService) *LimitHandler {
 	return &LimitHandler{
-		rl: ratelimit.New(rateLimit),
-		cl: NewSemaphore(concurrencyLimit),
+		limitService: limitService,
+		authService:  authService,
 	}
 }
 
 func (h *LimitHandler) LimitingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, err := getToken(r.Header.Get(authorizationHeader))
+		if err != nil {
+			HandleError(w, http.StatusUnauthorized, err)
+			return
+		}
+
+		email, err := h.authService.GetEmailFromToken(token)
+		if err != nil {
+			HandleError(w, http.StatusUnauthorized, err)
+			return
+		}
 
 	})
 }

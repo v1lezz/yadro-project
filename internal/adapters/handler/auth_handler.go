@@ -57,6 +57,7 @@ func (h *AuthHandler) AuthMiddleware(next http.Handler) http.Handler {
 		token, err := getToken(r.Header.Get(authorizationHeader))
 		if err != nil {
 			HandleError(w, http.StatusUnauthorized, err)
+			return
 		}
 
 		flag, err := h.svc.CheckToken(token)
