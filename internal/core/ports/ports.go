@@ -23,3 +23,10 @@ type ComicsRepository interface {
 	GetLastUpdateTime(ctx context.Context) (time.Time, error)
 	GetURLComicsByID(ctx context.Context, ID int) (string, error)
 }
+
+type AuthRepository interface {
+	//CheckUser(request domain.LoginRequest) (bool, error)
+	GetPasswordByEmail(email string) (string, error)
+	CheckAdminByEmail(email string) (bool, error)
+	//CheckUserByEmail(email string) (bool, error)
+}

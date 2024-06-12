@@ -7,3 +7,5 @@ run: build start_database
 bench: build
 	./xkcd -c="config.yaml"
 	 go test -bench=. ./pkg/database ./pkg/index
+docker_run:
+	docker-compose up -d
