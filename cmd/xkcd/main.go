@@ -41,9 +41,16 @@ func main() {
 	}
 	stemmer := words.NewSnowBallStem()
 	parser := xkcd.NewXkcdParse(cfg.AppCFG.SourceURL, cfg.AppCFG.Parallel, stemmer)
-	svc := services.NewComicsService(db, parser, idx, stemmer)
+	cSVC := services.NewComicsService(db, parser, idx, stemmer)
+
+	authDB, err := repository.NewAuthJSONRepository("users.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	aSVC := services.NewAuthService(authDB, cfg.AuthCFG.TokenMaxTime)
+	lSVC := services.NewLimitService(cfg.SrvCFG.RateLimit, cfg.SrvCFG.ConcurrencyLimit)
 	mutex := &sync.Mutex{}
-	srv := NewServer(ctx, *svc, mutex, fmt.Sprintf(":%d", cfg.SrvCFG.Port))
+	srv := NewServer(ctx, *cSVC, *lSVC, *aSVC, mutex, fmt.Sprintf(":%d", cfg.SrvCFG.Port))
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	go func() {
@@ -52,6 +59,7 @@ func main() {
 		}
 	}()
 	<-ctx.Done()
+	//ждем завершения последнего апдейта
 	mutex.Lock()
 	ctx, cancel = context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
@@ -61,12 +69,14 @@ func main() {
 
 }
 
-func NewServer(ctx context.Context, svc services.ComicsService, mutex *sync.Mutex, addr string) *http.Server {
+func NewServer(ctx context.Context, cSVC services.ComicsService, lSVC services.LimitService, aSVC services.AuthService, mutex *sync.Mutex, addr string) *http.Server {
 	router := http.NewServeMux()
-	c := handler.NewComicsHandler(svc, mutex)
-	router.HandleFunc("GET /pics", c.GetComics)
-	router.HandleFunc("POST /update", c.UpdateComics)
-	router.HandleFunc("POST /login", nil)
+	c := handler.NewComicsHandler(cSVC, mutex)
+	l := handler.NewLimitHandler(lSVC, aSVC)
+	a := handler.NewAuthHandler(aSVC)
+	router.Handle("GET /pics", a.AuthMiddleware(http.HandlerFunc(c.GetComics)))
+	router.Handle("POST /update", l.LimitingMiddleware(http.HandlerFunc(c.UpdateComics)))
+	router.HandleFunc("POST /login", a.LoginHandler)
 	go func() {
 		for {
 			select {
@@ -74,7 +84,7 @@ func NewServer(ctx context.Context, svc services.ComicsService, mutex *sync.Mute
 				return
 			case <-time.After(time.Hour * 24):
 				if mutex.TryLock() {
-					_, _ = svc.UpdateComics(ctx)
+					_, _ = cSVC.UpdateComics(ctx)
 					mutex.Unlock()
 				}
 			}

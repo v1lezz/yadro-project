@@ -8,6 +8,7 @@ import (
 	"yadro-project/internal/core/ports"
 
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -17,11 +18,11 @@ var (
 
 type AuthService struct {
 	repo         ports.AuthRepository
-	tokenMaxTime uint
+	tokenMaxTime time.Duration
 	jwtSecretKey []byte
 }
 
-func NewAuthService(repo ports.AuthRepository, tokenMaxTime uint) *AuthService {
+func NewAuthService(repo ports.AuthRepository, tokenMaxTime time.Duration) *AuthService {
 	return &AuthService{
 		repo:         repo,
 		tokenMaxTime: tokenMaxTime,
@@ -30,19 +31,21 @@ func NewAuthService(repo ports.AuthRepository, tokenMaxTime uint) *AuthService {
 }
 
 func (svc *AuthService) Login(request domain.LoginRequest) (string, error) {
-	flag, err := svc.repo.CheckUser(request)
+	pass, err := svc.repo.GetPasswordByEmail(request.Email)
 
 	if err != nil {
+		if errors.Is(err, ports.ErrIsNotExist) {
+			return "", ErrBadCredentials
+		}
 		return "", fmt.Errorf("error check user: %w", err)
 	}
 
-	if !flag {
+	if err := bcrypt.CompareHashAndPassword([]byte(pass), []byte(request.Password)); err != nil {
 		return "", ErrBadCredentials
 	}
-
 	payload := jwt.MapClaims{
 		"sub": request.Email,
-		"exp": time.Now().Add(time.Minute * time.Duration(svc.tokenMaxTime)).Unix(),
+		"exp": time.Now().Add(time.Minute * svc.tokenMaxTime).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, payload)
@@ -60,7 +63,10 @@ func (svc *AuthService) CheckToken(sToken string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return svc.repo.CheckUserByEmail(email)
+	if _, err = svc.repo.GetPasswordByEmail(email); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (svc *AuthService) GetEmailFromToken(sToken string) (string, error) {

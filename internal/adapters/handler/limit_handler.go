@@ -30,6 +30,14 @@ func (h *LimitHandler) LimitingMiddleware(next http.Handler) http.Handler {
 			HandleError(w, http.StatusUnauthorized, err)
 			return
 		}
+		reservation, err := h.limitService.Limit(email)
+		if err != nil {
+			HandleError(w, http.StatusTooManyRequests, err)
+			return
+		}
 
+		next.ServeHTTP(w, r)
+
+		h.limitService.Done(reservation)
 	})
 }

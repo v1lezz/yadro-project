@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+
 	"golang.org/x/time/rate"
 )
 
@@ -35,22 +36,27 @@ type LimitService struct {
 
 func NewLimitService(rateLimit, concurrencyLimit int) *LimitService {
 	return &LimitService{
-		rl: make(map[string]*rate.Limiter),
-		rateLimit:
-		cl: NewSemaphore(concurrencyLimit),
+		rl:        make(map[string]*rate.Limiter),
+		rateLimit: rateLimit,
+		cl:        NewSemaphore(concurrencyLimit),
 	}
 }
 
-func (svc *LimitService) Limit(email string) error {
+func (svc *LimitService) Limit(email string) (*rate.Reservation, error) {
 	if _, ok := svc.rl[email]; !ok {
 		svc.rl[email] = rate.NewLimiter(rate.Limit(svc.rateLimit), 10)
 	}
 
-	select {
-	case svc.rl[email].:
-		return ErrManyRequests
-	default:
+	if !svc.rl[email].Allow() {
+		return nil, ErrManyRequests
 	}
 
-	return nil
+	r := svc.rl[email].Reserve()
+	svc.cl.Acquire()
+	return r, nil
+}
+
+func (svc *LimitService) Done(r *rate.Reservation) {
+	r.Cancel()
+	svc.cl.Release()
 }

@@ -1,0 +1,11 @@
+{
+  "admins":
+  {
+    "admin@amdin.com":"$2a$04$04tYFpSizAOqMxpcLwyCA.dRyrOsb169S3U0Jd6VdL/DKMu5Bs0Ca"
+  },
+  "users":
+  {
+    "simple2@simple.com":"$2a$04$qUUTR1iC3TdmC3RtVLopOe4/Q2eeFgLF832cKJtrmBn0Fy73AYrUS",
+    "simple@simple.com":"$2a$04$kCoWX52S6EbNiW9x9V0/TuD/OApDDnZJb3cHF.4Dt8CaUBn6RxRkq"
+  }
+}

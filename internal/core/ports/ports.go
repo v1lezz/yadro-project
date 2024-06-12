@@ -25,7 +25,8 @@ type ComicsRepository interface {
 }
 
 type AuthRepository interface {
-	CheckUser(request domain.LoginRequest) (bool, error)
+	//CheckUser(request domain.LoginRequest) (bool, error)
+	GetPasswordByEmail(email string) (string, error)
 	CheckAdminByEmail(email string) (bool, error)
-	CheckUserByEmail(email string) (bool, error)
+	//CheckUserByEmail(email string) (bool, error)
 }

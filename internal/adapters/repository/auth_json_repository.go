@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"yadro-project/internal/core/domain"
+	"yadro-project/internal/core/ports"
 )
 
 var errAuthFileIsNotExist = errors.New("auth file is not exist")
@@ -44,16 +44,28 @@ func NewAuthJSONRepository(filePath string) (*AuthJSONRepository, error) {
 	return authRepo, nil
 }
 
-func (r *AuthJSONRepository) CheckUser(request domain.LoginRequest) (bool, error) {
-	if password, ok := r.Users[request.Email]; ok && password == request.Password {
-		return true, nil
+//func (r *AuthJSONRepository) CheckUser(request domain.LoginRequest) (bool, error) {
+//	if password, ok := r.Users[request.Email]; ok && password == request.Password {
+//		return true, nil
+//	}
+//
+//	if password, ok := r.Admins[request.Email]; ok && password == request.Password {
+//		return true, nil
+//	}
+//
+//	return false, nil
+//}
+
+func (r *AuthJSONRepository) GetPasswordByEmail(email string) (string, error) {
+	if password, ok := r.Users[email]; ok {
+		return password, nil
 	}
 
-	if password, ok := r.Admins[request.Email]; ok && password == request.Password {
-		return true, nil
+	if password, ok := r.Admins[email]; ok {
+		return password, nil
 	}
 
-	return false, nil
+	return "", ports.ErrIsNotExist
 }
 
 func (r *AuthJSONRepository) CheckUserByEmail(email string) (bool, error) {
